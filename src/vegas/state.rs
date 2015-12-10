@@ -57,6 +57,10 @@ impl Spin {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
+    pub fn z(&self) -> f64 {
+        self.z
+    }
+
 }
 
 

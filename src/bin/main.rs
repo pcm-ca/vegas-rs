@@ -8,6 +8,7 @@ use vegas::state::StateConstructors;
 use vegas::state::CommonObservables;
 use vegas::energy::EnergyComponent;
 use vegas::energy::ComplexExchangeComponent;
+use vegas::energy::ZAxisAnisotropy;
 use vegas::integrator::Integrator;
 use vegas::integrator::MetropolisIntegrator;
 
@@ -57,6 +58,7 @@ pub fn main() {
     let mut state = State::rand_with_norms(latt.nsites(), &spins);
 
     let hamiltonian = hamiltonian!(
+        ZAxisAnisotropy::new(1.2484),
         ComplexExchangeComponent::new(Adjacency::new(&latt))
     );
 

@@ -87,6 +87,25 @@ impl EnergyComponent for ComplexExchangeComponent {
 }
 
 
+pub struct ZAxisAnisotropy {
+    k: f64,
+}
+
+
+impl ZAxisAnisotropy {
+    pub fn new(k: f64) -> ZAxisAnisotropy {
+        ZAxisAnisotropy { k: k }
+    }
+}
+
+
+impl EnergyComponent for ZAxisAnisotropy {
+    fn energy(&self, state: &State, index: usize) -> f64 {
+        self.k * state[index].z() * state[index].z()
+    }
+}
+
+
 pub struct ComposedEnergy<T1, T2> where T1: EnergyComponent, T2: EnergyComponent {
     comp1: T1,
     comp2: T2,
