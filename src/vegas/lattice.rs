@@ -13,6 +13,13 @@ pub struct Site {
 }
 
 
+impl Site {
+    pub fn atom(&self) -> u32 {
+        self.atom
+    }
+}
+
+
 /// Represents a lattice, it requires the periodicity of the lattice,
 /// its shape, its number of atoms per site and the vertices as a list
 /// of vertex descriptors
@@ -80,16 +87,18 @@ impl Lattice {
         })
     }
 
-    pub fn targets(&self, site: &Site) -> Option<Vec<Site>> {
+    pub fn tgts(&self, site: &Site) -> Option<Vec<(Site, Option<f64>)>> {
         self.inside(site).map(|site| {
-            let mut tgts: Vec<Site> = vec![];
+            let mut tgts: Vec<(Site, Option<f64>)> = vec![];
             for vx in &self.vertices {
-                match vx.target_for(&site) {
+                match vx.tgt_for(&site) {
                     None => continue,
                     Some(tgt) => {
                         match self.inside(&tgt) {
                             None => continue,
-                            Some(tgt) => tgts.push(tgt),
+                            Some(tgt) => {
+                                tgts.push((tgt, vx.exch));
+                            },
                         }
                     },
                 }
@@ -104,6 +113,15 @@ impl Lattice {
             self.shape.1 as usize *
             self.shape.2 as usize
     }
+
+    pub fn map_for_sites<T>(&self, op: fn(&Site) -> T) -> Vec<T> {
+        let mut data: Vec<T> = vec![];
+        for site in self.sites() {
+            data.push(op(&site));
+        }
+        data
+    }
+
 }
 
 
@@ -243,88 +261,256 @@ impl Iterator for SiteIterator {
 /// Represents a vertex descriptor, for a vertex that can go beyond the
 /// unit cell of a lattice.
 pub struct Vertex {
-    source: u32,
-    target: u32,
+    src: u32,
+    tgt: u32,
     delta: (i64, i64, i64),
+    exch: Option<f64>,
 }
 
 
 impl Vertex {
 
-    fn target_for(&self, site: &Site) -> Option<Site> {
-        if site.atom != self.source {
+    fn tgt_for(&self, site: &Site) -> Option<Site> {
+        if site.atom != self.src {
             return None
         }
         Some(Site {
             cell: (site.cell.0 + self.delta.0,
                    site.cell.1 + self.delta.1,
                    site.cell.2 + self.delta.2),
-                   atom: self.target,
+                   atom: self.tgt,
         })
     }
 
     pub fn list_for_cubic() -> Vec<Vertex> {
         vec![
-            Vertex{ source: 0, target: 0, delta: (1, 0, 0) },
-            Vertex{ source: 0, target: 0, delta: (0, 1, 0) },
-            Vertex{ source: 0, target: 0, delta: (0, 0, 1) },
-            Vertex{ source: 0, target: 0, delta: (-1, 0, 0) },
-            Vertex{ source: 0, target: 0, delta: (0, -1, 0) },
-            Vertex{ source: 0, target: 0, delta: (0, 0, -1) },
+            Vertex { src: 0, tgt: 0, delta: (1, 0, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (0, 1, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (0, 0, 1), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (-1, 0, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (0, -1, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (0, 0, -1), exch: None },
         ]
     }
 
     pub fn list_for_hcp() -> Vec<Vertex> {
         vec![
             // Zero in plane
-            Vertex { source: 0, target: 0, delta: (1, 0, 0) },
-            Vertex { source: 0, target: 0, delta: (0, 1, 0) },
-            Vertex { source: 0, target: 0, delta: (1, 1, 0) },
+            Vertex { src: 0, tgt: 0, delta: (1, 0, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (0, 1, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (1, 1, 0), exch: None },
             // Zero in plane backwards
-            Vertex { source: 0, target: 0, delta: (-1,  0, 0) },
-            Vertex { source: 0, target: 0, delta: ( 0, -1, 0) },
-            Vertex { source: 0, target: 0, delta: (-1, -1, 0) },
+            Vertex { src: 0, tgt: 0, delta: (-1,  0, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: ( 0, -1, 0), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (-1, -1, 0), exch: None },
             // One in plane
-            Vertex { source: 1, target: 1, delta: (1, 0, 0) },
-            Vertex { source: 1, target: 1, delta: (0, 1, 0) },
-            Vertex { source: 1, target: 1, delta: (1, 1, 0) },
+            Vertex { src: 1, tgt: 1, delta: (1, 0, 0), exch: None },
+            Vertex { src: 1, tgt: 1, delta: (0, 1, 0), exch: None },
+            Vertex { src: 1, tgt: 1, delta: (1, 1, 0), exch: None },
             // One in plane backwards
-            Vertex { source: 1, target: 1, delta: (-1,  0, 0) },
-            Vertex { source: 1, target: 1, delta: ( 0, -1, 0) },
-            Vertex { source: 1, target: 1, delta: (-1, -1, 0) },
+            Vertex { src: 1, tgt: 1, delta: (-1,  0, 0), exch: None },
+            Vertex { src: 1, tgt: 1, delta: ( 0, -1, 0), exch: None },
+            Vertex { src: 1, tgt: 1, delta: (-1, -1, 0), exch: None },
             // Zero with one
-            Vertex { source: 0, target: 1, delta: ( 0,  0, 0) },
-            Vertex { source: 0, target: 1, delta: (-1,  0, 0) },
-            Vertex { source: 0, target: 1, delta: (-1, -1, 0) },
+            Vertex { src: 0, tgt: 1, delta: ( 0,  0, 0), exch: None },
+            Vertex { src: 0, tgt: 1, delta: (-1,  0, 0), exch: None },
+            Vertex { src: 0, tgt: 1, delta: (-1, -1, 0), exch: None },
             // Zero with one downwards
-            Vertex { source: 0, target: 1, delta: ( 0,  0, -1) },
-            Vertex { source: 0, target: 1, delta: (-1,  0, -1) },
-            Vertex { source: 0, target: 1, delta: (-1, -1, -1) },
+            Vertex { src: 0, tgt: 1, delta: ( 0,  0, -1), exch: None },
+            Vertex { src: 0, tgt: 1, delta: (-1,  0, -1), exch: None },
+            Vertex { src: 0, tgt: 1, delta: (-1, -1, -1), exch: None },
             // One with zero
-            Vertex { source: 1, target: 0, delta: ( 0,  0, 0) },
-            Vertex { source: 1, target: 0, delta: ( 1,  0, 0) },
-            Vertex { source: 1, target: 0, delta: ( 1,  1, 0) },
+            Vertex { src: 1, tgt: 0, delta: ( 0,  0, 0), exch: None },
+            Vertex { src: 1, tgt: 0, delta: ( 1,  0, 0), exch: None },
+            Vertex { src: 1, tgt: 0, delta: ( 1,  1, 0), exch: None },
             // Zero with one upwards
-            Vertex { source: 1, target: 0, delta: ( 0,  0,  1) },
-            Vertex { source: 1, target: 0, delta: ( 1,  0,  1) },
-            Vertex { source: 1, target: 0, delta: ( 1,  1,  1) },
+            Vertex { src: 1, tgt: 0, delta: ( 0,  0,  1), exch: None },
+            Vertex { src: 1, tgt: 0, delta: ( 1,  0,  1), exch: None },
+            Vertex { src: 1, tgt: 0, delta: ( 1,  1,  1), exch: None },
         ]
     }
 
     pub fn list_for_honeycomb() -> Vec<Vertex> {
         vec![
-            Vertex{ source: 0, target: 1, delta: (0, 0, 0) },
-            Vertex{ source: 1, target: 0, delta: (0, 0, 0) },
-            Vertex{ source: 0, target: 1, delta: (1, 0, 0) },
-            Vertex{ source: 1, target: 0, delta: (0, 1, 0) },
-            Vertex{ source: 0, target: 1, delta: (-1, 0, 0) },
-            Vertex{ source: 1, target: 0, delta: (0, -1, 0) },
+            Vertex { src: 0, tgt: 1, delta: (0, 0, 0), exch: None },
+            Vertex { src: 1, tgt: 0, delta: (0, 0, 0), exch: None },
+            Vertex { src: 0, tgt: 1, delta: (1, 0, 0), exch: None },
+            Vertex { src: 1, tgt: 0, delta: (0, 1, 0), exch: None },
+            Vertex { src: 0, tgt: 1, delta: (-1, 0, 0), exch: None },
+            Vertex { src: 1, tgt: 0, delta: (0, -1, 0), exch: None },
 
             // For the 3D lulz
-            Vertex{ source: 0, target: 0, delta: (0, 0, 1) },
-            Vertex{ source: 1, target: 1, delta: (0, 0, 1) },
-            Vertex{ source: 0, target: 0, delta: (0, 0, -1) },
-            Vertex{ source: 1, target: 1, delta: (0, 0, -1) },
+            Vertex { src: 0, tgt: 0, delta: (0, 0, 1), exch: None },
+            Vertex { src: 1, tgt: 1, delta: (0, 0, 1), exch: None },
+            Vertex { src: 0, tgt: 0, delta: (0, 0, -1), exch: None },
+            Vertex { src: 1, tgt: 1, delta: (0, 0, -1), exch: None },
+        ]
+    }
+
+    pub fn list_for_manganite() -> Vec<Vertex> {
+        vec![
+            Vertex { src: 0,  tgt: 2,  delta: (-1, 0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 0,  tgt: 6,  delta: (0,  -1, 0,  ), exch: Some(4.65), },
+            Vertex { src: 0,  tgt: 18, delta: (0,  0,  -1, ), exch: Some(4.65), },
+            Vertex { src: 0,  tgt: 1,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 0,  tgt: 3,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 0,  tgt: 9,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 1,  tgt: 7,  delta: (0,  -1, 0,  ), exch: Some(1.35), },
+            Vertex { src: 1,  tgt: 19, delta: (0,  0,  -1, ), exch: Some(1.35), },
+            Vertex { src: 1,  tgt: 0,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 1,  tgt: 2,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 1,  tgt: 4,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 1,  tgt: 10, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 2,  tgt: 8,  delta: (0,  -1, 0,  ), exch: Some(7.77), },
+            Vertex { src: 2,  tgt: 20, delta: (0,  0,  -1, ), exch: Some(7.77), },
+            Vertex { src: 2,  tgt: 1,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 2,  tgt: 5,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 2,  tgt: 11, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 2,  tgt: 0,  delta: (1,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 3,  tgt: 5,  delta: (-1, 0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 3,  tgt: 21, delta: (0,  0,  -1, ), exch: Some(1.35), },
+            Vertex { src: 3,  tgt: 0,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 3,  tgt: 4,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 3,  tgt: 6,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 3,  tgt: 12, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 4,  tgt: 22, delta: (0,  0,  -1, ), exch: Some(7.77), },
+            Vertex { src: 4,  tgt: 1,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 4,  tgt: 3,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 4,  tgt: 5,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 4,  tgt: 7,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 4,  tgt: 13, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 5,  tgt: 23, delta: (0,  0,  -1, ), exch: Some(4.65), },
+            Vertex { src: 5,  tgt: 2,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 5,  tgt: 4,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 5,  tgt: 8,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 5,  tgt: 14, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 5,  tgt: 3,  delta: (1,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 6,  tgt: 8,  delta: (-1, 0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 6,  tgt: 24, delta: (0,  0,  -1, ), exch: Some(7.77), },
+            Vertex { src: 6,  tgt: 3,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 6,  tgt: 7,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 6,  tgt: 15, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 6,  tgt: 0,  delta: (0,  1,  0,  ), exch: Some(4.65), },
+            Vertex { src: 7,  tgt: 25, delta: (0,  0,  -1, ), exch: Some(4.65), },
+            Vertex { src: 7,  tgt: 4,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 7,  tgt: 6,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 7,  tgt: 8,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 7,  tgt: 16, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 7,  tgt: 1,  delta: (0,  1,  0,  ), exch: Some(1.35), },
+            Vertex { src: 8,  tgt: 26, delta: (0,  0,  -1, ), exch: Some(1.35), },
+            Vertex { src: 8,  tgt: 5,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 8,  tgt: 7,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 8,  tgt: 17, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 8,  tgt: 2,  delta: (0,  1,  0,  ), exch: Some(7.77), },
+            Vertex { src: 8,  tgt: 6,  delta: (1,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 9,  tgt: 11, delta: (-1, 0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 9,  tgt: 15, delta: (0,  -1, 0,  ), exch: Some(1.35), },
+            Vertex { src: 9,  tgt: 0,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 9,  tgt: 10, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 9,  tgt: 12, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 9,  tgt: 18, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 10, tgt: 16, delta: (0,  -1, 0,  ), exch: Some(7.77), },
+            Vertex { src: 10, tgt: 1,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 10, tgt: 9,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 10, tgt: 11, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 10, tgt: 13, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 10, tgt: 19, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 11, tgt: 17, delta: (0,  -1, 0,  ), exch: Some(4.65), },
+            Vertex { src: 11, tgt: 2,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 11, tgt: 10, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 11, tgt: 14, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 11, tgt: 20, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 11, tgt: 9,  delta: (1,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 12, tgt: 14, delta: (-1, 0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 12, tgt: 3,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 12, tgt: 9,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 12, tgt: 13, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 12, tgt: 15, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 12, tgt: 21, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 13, tgt: 4,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 13, tgt: 10, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 13, tgt: 12, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 13, tgt: 14, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 13, tgt: 16, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 13, tgt: 22, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 14, tgt: 5,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 14, tgt: 11, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 14, tgt: 13, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 14, tgt: 17, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 14, tgt: 23, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 14, tgt: 12, delta: (1,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 15, tgt: 17, delta: (-1, 0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 15, tgt: 6,  delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 15, tgt: 12, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 15, tgt: 16, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 15, tgt: 24, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 15, tgt: 9,  delta: (0,  1,  0,  ), exch: Some(1.35), },
+            Vertex { src: 16, tgt: 7,  delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 16, tgt: 13, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 16, tgt: 15, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 16, tgt: 17, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 16, tgt: 25, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 16, tgt: 10, delta: (0,  1,  0,  ), exch: Some(7.77), },
+            Vertex { src: 17, tgt: 8,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 17, tgt: 14, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 17, tgt: 16, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 17, tgt: 26, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 17, tgt: 11, delta: (0,  1,  0,  ), exch: Some(4.65), },
+            Vertex { src: 17, tgt: 15, delta: (1,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 18, tgt: 20, delta: (-1, 0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 18, tgt: 24, delta: (0,  -1, 0,  ), exch: Some(7.77), },
+            Vertex { src: 18, tgt: 9,  delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 18, tgt: 19, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 18, tgt: 21, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 18, tgt: 0,  delta: (0,  0,  1,  ), exch: Some(4.65), },
+            Vertex { src: 19, tgt: 25, delta: (0,  -1, 0,  ), exch: Some(4.65), },
+            Vertex { src: 19, tgt: 10, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 19, tgt: 18, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 19, tgt: 20, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 19, tgt: 22, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 19, tgt: 1,  delta: (0,  0,  1,  ), exch: Some(1.35), },
+            Vertex { src: 20, tgt: 26, delta: (0,  -1, 0,  ), exch: Some(1.35), },
+            Vertex { src: 20, tgt: 11, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 20, tgt: 19, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 20, tgt: 23, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 20, tgt: 2,  delta: (0,  0,  1,  ), exch: Some(7.77), },
+            Vertex { src: 20, tgt: 18, delta: (1,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 21, tgt: 23, delta: (-1, 0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 21, tgt: 12, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 21, tgt: 18, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 21, tgt: 22, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 21, tgt: 24, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 21, tgt: 3,  delta: (0,  0,  1,  ), exch: Some(1.35), },
+            Vertex { src: 22, tgt: 13, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 22, tgt: 19, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 22, tgt: 21, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 22, tgt: 23, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 22, tgt: 25, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 22, tgt: 4,  delta: (0,  0,  1,  ), exch: Some(7.77), },
+            Vertex { src: 23, tgt: 14, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 23, tgt: 20, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 23, tgt: 22, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 23, tgt: 26, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 23, tgt: 5,  delta: (0,  0,  1,  ), exch: Some(4.65), },
+            Vertex { src: 23, tgt: 21, delta: (1,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 24, tgt: 26, delta: (-1, 0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 24, tgt: 15, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 24, tgt: 21, delta: (0,  0,  0,  ), exch: Some(1.35), },
+            Vertex { src: 24, tgt: 25, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 24, tgt: 6,  delta: (0,  0,  1,  ), exch: Some(7.77), },
+            Vertex { src: 24, tgt: 18, delta: (0,  1,  0,  ), exch: Some(7.77), },
+            Vertex { src: 25, tgt: 16, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 25, tgt: 22, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 25, tgt: 24, delta: (0,  0,  0,  ), exch: Some(7.77), },
+            Vertex { src: 25, tgt: 26, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 25, tgt: 7,  delta: (0,  0,  1,  ), exch: Some(4.65), },
+            Vertex { src: 25, tgt: 19, delta: (0,  1,  0,  ), exch: Some(4.65), },
+            Vertex { src: 26, tgt: 17, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 26, tgt: 23, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 26, tgt: 25, delta: (0,  0,  0,  ), exch: Some(4.65), },
+            Vertex { src: 26, tgt: 8,  delta: (0,  0,  1,  ), exch: Some(1.35), },
+            Vertex { src: 26, tgt: 20, delta: (0,  1,  0,  ), exch: Some(1.35), },
+            Vertex { src: 26, tgt: 24, delta: (1,  0,  0,  ), exch: Some(1.35), },
         ]
     }
 }
@@ -333,6 +519,7 @@ impl Vertex {
 pub struct Adjacency {
     lims: Vec<usize>,
     nbhs: Vec<usize>,
+    exch: Vec<f64>,
 }
 
 
@@ -341,16 +528,21 @@ impl Adjacency {
     {
         let mut lims = vec![0];
         let mut nbhs = vec![];
+        let mut exch = vec![];
         for site in lattice.sites() {
-            let pnbhs: Vec<usize>  = lattice.targets(&site)
-                .expect("No sites ma frien").iter().map(|site| {
-                    lattice.index(&site).expect("Site outside lattice")
-                }).collect();
+            let targets = lattice.tgts(&site).unwrap();
+            let mut pnbhs: Vec<usize> = vec![];
+            let mut pexch: Vec<f64> = vec![];
+            for (site, exchange) in targets {
+                pnbhs.push(lattice.index(&site).unwrap());
+                pexch.push(exchange.unwrap_or(0.0));
+            }
             let last = lims.last().unwrap().clone();
             lims.push(last + pnbhs.len());
             nbhs.extend(pnbhs.iter());
+            exch.extend(pexch.iter());
         }
-        Adjacency { lims: lims, nbhs: nbhs, }
+        Adjacency { lims: lims, nbhs: nbhs, exch: exch, }
     }
 
     pub fn nbhs_of<'a>(&'a self, item: usize) -> Option<&'a[usize]> {
@@ -360,6 +552,15 @@ impl Adjacency {
         let low = self.lims[item] as usize;
         let hi = self.lims[item + 1] as usize;
         Some(&self.nbhs[low..hi])
+    }
+
+    pub fn exch_of<'a>(&'a self, item: usize) -> Option<&'a[f64]> {
+        if item >= self.lims.len() - 1 {
+            return None
+        }
+        let low = self.lims[item] as usize;
+        let hi = self.lims[item + 1] as usize;
+        Some(&self.exch[low..hi])
     }
 }
 
@@ -417,4 +618,17 @@ fn testing_the_inside() {
     assert!(latt.inside(&Site { cell: (10, -1, 9), atom: 0 }).is_some());
     assert!(latt.inside(&Site { cell: (10, 10, 10), atom: 0 }).is_none());
     assert!(latt.inside(&Site { cell: (10, 10, 9), atom: 2 }).is_none());
+}
+
+#[test]
+fn test_big_magnetite() {
+    let latt = LatticeBuilder::new()
+        .pbc((true, true, true))
+        .shape((4, 4, 4))
+        .natoms(27)
+        .vertices(Vertex::list_for_manganite())
+        .finalize();
+    let adj = Adjacency::new(&latt);
+    assert_eq!(1729, adj.lims.len());
+    assert_eq!(10368, adj.nbhs.len());
 }

@@ -20,12 +20,13 @@ pub trait EnergyComponent {
 
 pub struct ExchangeComponent {
     adjacency: Adjacency,
+    exchange: f64,
 }
 
 
 impl ExchangeComponent {
-    pub fn new(adjacency: Adjacency) -> ExchangeComponent {
-        ExchangeComponent { adjacency: adjacency }
+    pub fn new(adjacency: Adjacency, exchange: f64) -> ExchangeComponent {
+        ExchangeComponent { adjacency: adjacency, exchange: exchange, }
     }
 }
 
@@ -37,6 +38,41 @@ impl EnergyComponent for ExchangeComponent {
         let s = state[index];
         for nb in self.adjacency.nbhs_of(index).unwrap() {
             ene -= s * state[*nb];
+        }
+        ene * self.exchange
+    }
+
+    fn total_energy(&self, state: &State) -> f64 {
+        let mut total = 0f64;
+        for i in 0..state.len() {
+            total += self.energy(state, i);
+        }
+        0.5 * total
+    }
+}
+
+
+pub struct ComplexExchangeComponent {
+    adjacency: Adjacency,
+}
+
+
+impl ComplexExchangeComponent {
+    pub fn new(adjacency: Adjacency) -> ComplexExchangeComponent {
+        ComplexExchangeComponent { adjacency: adjacency }
+    }
+}
+
+
+impl EnergyComponent for ComplexExchangeComponent {
+
+    fn energy(&self, state: &State, index: usize) -> f64 {
+        let mut ene = 0f64;
+        let s = state[index];
+        let nbhs = self.adjacency.nbhs_of(index).unwrap().iter();
+        let exch = self.adjacency.exch_of(index).unwrap().iter();
+        for (nb, exc) in nbhs.zip(exch) {
+            ene -= exc * (s * state[*nb]);
         }
         ene
     }

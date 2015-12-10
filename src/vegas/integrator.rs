@@ -45,7 +45,7 @@ impl<T: EnergyComponent> Integrator<T> for MetropolisIntegrator {
         for _ in 0..new_state.len() {
             let site = sites.ind_sample(&mut rng);
             let old_energy = energy.energy(&new_state, site);
-            new_state[site] = Spin::rand();
+            new_state[site] = Spin::rand().with_norm(state[site].norm());
             let new_energy = energy.energy(&new_state, site);
             let delta = new_energy - old_energy;
             if delta < 0.0 {
