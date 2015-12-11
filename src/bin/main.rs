@@ -18,11 +18,11 @@ pub fn main() {
     let latt = LatticeBuilder::new()
         .pbc((true, true, true))
         .shape((4, 4, 4))
-        .vertices(Vertex::list_for_manganite())
-        .natoms(27)
+        .vertices(Vertex::list_for_magnetite())
+        .natoms(24)
         .finalize();
 
-    let spins: Vec<f64> = latt.sites().map(|site| {
+    let _manganite_spins: Vec<f64> = latt.sites().map(|site| {
         match site.atom() {
             0  => 2.0,
             1  => 1.5,
@@ -55,14 +55,41 @@ pub fn main() {
         }
     }).collect();
 
+    let spins: Vec<f64> = latt.sites().map(|site| {
+        match site.atom() {
+            0  => 5.0,
+            1  => 5.0,
+            2  => 6.0,
+            3  => 6.0,
+            4  => 6.0,
+            5  => 6.0,
+            6  => 5.0,
+            7  => 5.0,
+            8  => 6.0,
+            9  => 6.0,
+            10 => 6.0,
+            11 => 6.0,
+            12 => 5.0,
+            13 => 5.0,
+            14 => 6.0,
+            15 => 6.0,
+            16 => 6.0,
+            17 => 6.0,
+            18 => 5.0,
+            19 => 5.0,
+            20 => 6.0,
+            21 => 6.0,
+            22 => 6.0,
+            23 => 6.0,
+            _ => panic!("oh margoth"),
+        }
+    }).collect();
+
     let mut state = State::rand_with_norms(latt.nsites(), &spins);
 
-    let hamiltonian = hamiltonian!(
-        ZAxisAnisotropy::new(1.2484),
-        ComplexExchangeComponent::new(Adjacency::new(&latt))
-    );
+    let hamiltonian = ComplexExchangeComponent::new(Adjacency::new(&latt));
 
-    let mut integrator = MetropolisIntegrator::new(25.0);
+    let mut integrator = MetropolisIntegrator::new(250.0);
 
     loop {
         for _ in 0..1000 {
@@ -72,7 +99,7 @@ pub fn main() {
         if integrator.temp() < 0.1 {
             break
         }
-        integrator.cool(1.0);
+        integrator.cool(10.0);
         println!("");
     }
 
