@@ -74,7 +74,7 @@ impl EnergyComponent for ComplexExchangeComponent {
         for (nb, exc) in nbhs.zip(exch) {
             ene -= exc * (s * state[*nb]);
         }
-        ene
+        2.0 * ene
     }
 
     fn total_energy(&self, state: &State) -> f64 {
@@ -87,19 +87,19 @@ impl EnergyComponent for ComplexExchangeComponent {
 }
 
 
-pub struct ZAxisAnisotropy {
+pub struct ZAxisAnisotropyComponent {
     k: f64,
 }
 
 
-impl ZAxisAnisotropy {
-    pub fn new(k: f64) -> ZAxisAnisotropy {
-        ZAxisAnisotropy { k: k }
+impl ZAxisAnisotropyComponent {
+    pub fn new(k: f64) -> ZAxisAnisotropyComponent {
+        ZAxisAnisotropyComponent { k: k }
     }
 }
 
 
-impl EnergyComponent for ZAxisAnisotropy {
+impl EnergyComponent for ZAxisAnisotropyComponent {
     fn energy(&self, state: &State, index: usize) -> f64 {
         self.k * state[index].z() * state[index].z()
     }

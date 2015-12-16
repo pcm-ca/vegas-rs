@@ -8,7 +8,7 @@ use vegas::state::StateConstructors;
 use vegas::state::CommonObservables;
 use vegas::energy::EnergyComponent;
 use vegas::energy::ComplexExchangeComponent;
-use vegas::energy::ZAxisAnisotropy;
+use vegas::energy::ZAxisAnisotropyComponent;
 use vegas::integrator::Integrator;
 use vegas::integrator::MetropolisIntegrator;
 
@@ -17,7 +17,7 @@ pub fn main() {
 
     let latt = LatticeBuilder::new()
         .pbc((true, true, true))
-        .shape((4, 4, 4))
+        .shape((5, 5, 5))
         .vertices(Vertex::list_for_magnetite())
         .natoms(24)
         .finalize();
@@ -57,49 +57,63 @@ pub fn main() {
 
     let spins: Vec<f64> = latt.sites().map(|site| {
         match site.atom() {
-            0  => 5.0,
-            1  => 5.0,
-            2  => 6.0,
-            3  => 6.0,
-            4  => 6.0,
-            5  => 6.0,
-            6  => 5.0,
-            7  => 5.0,
-            8  => 6.0,
-            9  => 6.0,
-            10 => 6.0,
-            11 => 6.0,
-            12 => 5.0,
-            13 => 5.0,
-            14 => 6.0,
-            15 => 6.0,
-            16 => 6.0,
-            17 => 6.0,
-            18 => 5.0,
-            19 => 5.0,
-            20 => 6.0,
-            21 => 6.0,
-            22 => 6.0,
-            23 => 6.0,
+            0  => 2.5,
+            1  => 2.5,
+            2  => 2.0,
+            3  => 2.5,
+            4  => 2.5,
+            5  => 2.0,
+            6  => 2.5,
+            7  => 2.5,
+            8  => 2.5,
+            9  => 2.5,
+            10 => 2.5,
+            11 => 2.5,
+            12 => 2.5,
+            13 => 2.5,
+            14 => 2.0,
+            15 => 2.0,
+            16 => 2.5,
+            17 => 2.0,
+            18 => 2.5,
+            19 => 2.5,
+            20 => 2.5,
+            21 => 2.0,
+            22 => 2.0,
+            23 => 2.0,
             _ => panic!("oh margoth"),
         }
     }).collect();
 
+//    let _cobalt_spins: Vec<f64> = latt.sites().map(|site| {
+//        match site.atom() {
+//            0  => 1.0,
+//            1  => 1.0,
+//            _ => panic!("oh margoth"),
+//        }
+//    }).collect();
+
+
+    let hamiltonian = hamiltonian!(
+        ComplexExchangeComponent::new(Adjacency::new(&latt))
+        // ZAxisAnisotropyComponent::new(1.0)
+        );
+
+    let mut integrator = MetropolisIntegrator::new(100.0);
+
     let mut state = State::rand_with_norms(latt.nsites(), &spins);
 
-    let hamiltonian = ComplexExchangeComponent::new(Adjacency::new(&latt));
-
-    let mut integrator = MetropolisIntegrator::new(250.0);
+    println!("# number of sites: {}", state.len());
 
     loop {
         for _ in 0..1000 {
             state = integrator.step(&hamiltonian, &state);
             println!("{} {}", hamiltonian.total_energy(&state), state.mag_len());
         }
-        if integrator.temp() < 0.1 {
+        if integrator.temp() < 10.0 {
             break
         }
-        integrator.cool(10.0);
+        integrator.cool(2.5);
         println!("");
     }
 
